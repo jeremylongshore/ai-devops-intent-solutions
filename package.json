@@ -31,7 +31,7 @@
   },
   "homepage": "https://github.com/jeremylongshore/vibe-prd#readme",
   "dependencies": {
-    "js-yaml": "^4.1.0",
+    "js-yaml": "^4.1.1",
     "marked": "^12.0.0",
     "puppeteer": "^22.0.0"
   },
