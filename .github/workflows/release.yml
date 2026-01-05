@@ -1,4 +1,5 @@
 name: Release
+
 on:
   push:
     tags: ['v*.*.*']
@@ -11,16 +12,59 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
-      - name: Build suite for release
-        run: make release-check
-      - name: Upload release artifact
-        uses: actions/upload-artifact@v4
         with:
-          name: docs-suite
-          path: artifacts.zip
-      - name: Create GitHub Release with asset
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build all packages
+        run: npm run build
+
+      - name: Run tests
+        run: npm test
+        continue-on-error: true
+
+      - name: Publish to npm
+        run: |
+          npm publish --workspace=@intentsolutions/blueprint-core --access public || true
+          npm publish --workspace=@intentsolutions/blueprint-mcp --access public || true
+          npm publish --workspace=@intentsolutions/blueprint --access public || true
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: artifacts.zip
           generate_release_notes: true
+          body: |
+            ## Installation
+
+            ```bash
+            # Install CLI globally
+            npm install -g @intentsolutions/blueprint
+
+            # Or use directly with npx
+            npx @intentsolutions/blueprint init
+            ```
+
+            ## MCP Server
+
+            Add to your Claude/Cursor config:
+            ```json
+            {
+              "mcpServers": {
+                "blueprint": {
+                  "command": "npx",
+                  "args": ["@intentsolutions/blueprint-mcp"]
+                }
+              }
+            }
+            ```

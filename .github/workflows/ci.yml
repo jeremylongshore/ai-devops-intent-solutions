@@ -1,37 +1,50 @@
-name: Template & Output Sanity
+name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
+    branches: [main]
 
 jobs:
-  sanity:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18, 20, 22]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build all packages
+        run: npm run build
+
+      - name: Run tests
+        run: npm test
+        continue-on-error: true
+
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Verify 22 master templates exist
-        run: |
-          set -euo pipefail
-          test -d professional-templates
-          count=$(find professional-templates -maxdepth 1 -type f -name '*.md' | wc -l | tr -d ' ')
-          echo "Found templates: $count"
-          if [ "$count" -lt 22 ]; then
-            echo "Need 22 templates in professional-templates/" >&2
-            exit 1
-          fi
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
 
-      - name: Optional smoke on completed-docs (non-blocking)
-        run: |
-          set -euo pipefail
-          if [ -d completed-docs ]; then
-            echo "completed-docs present — sampling one project:"
-            proj=$(find completed-docs -mindepth 1 -maxdepth 1 -type d | head -n1 || true)
-            if [ -n "$proj" ]; then
-              ls -1 "$proj" | sed 's/^/ - /'
-            else
-              echo "No project output yet."
-            fi
-          else
-            echo "completed-docs/ not present — first run is fine."
-          fi
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run build

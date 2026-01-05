@@ -2,6 +2,7 @@
   "name": "@intentsolutions/blueprint-core",
   "version": "2.0.0",
   "description": "Core template engine for Intent Blueprint Docs",
+  "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
