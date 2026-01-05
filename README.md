@@ -84,6 +84,50 @@ Add to your Claude or Cursor MCP config:
 | **Standard** | 12 docs | Most projects |
 | **Comprehensive** | 22 docs | Enterprise, compliance |
 
+## Template Marketplace
+
+Install curated template packs for your industry or framework:
+
+```bash
+# Search for packs
+blueprint pack search fintech
+
+# Install a pack
+blueprint pack install blueprint-fintech
+
+# List installed packs
+blueprint pack list
+
+# Show featured packs
+blueprint pack featured
+```
+
+### Available Template Packs
+
+| Category | Packs | Description |
+|----------|-------|-------------|
+| **Verticals** | `blueprint-fintech`, `blueprint-healthtech`, `blueprint-saas` | Industry-specific templates |
+| **Compliance** | `blueprint-soc2`, `blueprint-hipaa`, `blueprint-gdpr` | Regulatory documentation |
+| **Frameworks** | `blueprint-nextjs`, `blueprint-fastapi`, `blueprint-rails` | Framework-optimized templates |
+
+### Vertical Packs
+
+- **FinTech** - Payment processing, KYC/AML, PCI-DSS compliance
+- **HealthTech** - HIPAA compliance, FHIR integration, PHI handling
+- **SaaS** - Multi-tenancy, subscription billing, onboarding flows
+
+### Compliance Packs
+
+- **SOC 2** - Trust services criteria, control mapping, audit prep
+- **HIPAA** - Privacy/Security rules, BAA templates, risk assessment
+- **GDPR** - Data subject rights, DPIA, privacy notices
+
+### Framework Packs
+
+- **Next.js** - App Router, API routes, deployment patterns
+- **FastAPI** - Async patterns, OpenAPI specs, testing strategies
+- **Rails** - Hotwire, Devise auth, RSpec testing
+
 ## Template Categories
 
 ### Product & Strategy (5 docs)
@@ -108,6 +152,68 @@ Add to your Claude or Cursor MCP config:
 | `@intentsolutions/blueprint` | CLI tool | [![npm](https://img.shields.io/npm/v/@intentsolutions/blueprint)](https://www.npmjs.com/package/@intentsolutions/blueprint) |
 | `@intentsolutions/blueprint-mcp` | MCP server | [![npm](https://img.shields.io/npm/v/@intentsolutions/blueprint-mcp)](https://www.npmjs.com/package/@intentsolutions/blueprint-mcp) |
 | `@intentsolutions/blueprint-core` | Core engine | [![npm](https://img.shields.io/npm/v/@intentsolutions/blueprint-core)](https://www.npmjs.com/package/@intentsolutions/blueprint-core) |
+
+## Plugin System
+
+Extend Blueprint with custom plugins:
+
+```typescript
+import { createPluginManager } from '@intentsolutions/blueprint';
+
+const manager = createPluginManager();
+
+// Register a custom formatter
+manager.register({
+  name: 'my-formatter',
+  version: '1.0.0',
+  type: 'formatter',
+  format: async (content, options) => {
+    // Transform content
+    return { content: transformedContent, format: 'custom' };
+  }
+});
+```
+
+### Plugin Types
+
+| Type | Purpose | Example |
+|------|---------|---------|
+| **Formatter** | Output transformation | Markdown, HTML, PDF |
+| **Validator** | Content quality checks | Completeness, style |
+| **Processor** | Pre/post processing | Variable injection |
+| **Integration** | External services | Slack, email |
+| **Hook** | Lifecycle events | Before/after generation |
+
+### Built-in Plugins
+
+- `markdown-formatter` - Clean Markdown output
+- `html-formatter` - HTML with styling
+- `quality-validator` - Content quality rules
+
+## Analytics Dashboard
+
+Track usage and optimize your documentation workflow:
+
+```bash
+# View analytics dashboard
+blueprint analytics
+
+# Template usage stats
+blueprint analytics templates
+
+# Pack installation stats
+blueprint analytics packs
+
+# Export data
+blueprint analytics export --format=csv
+```
+
+### Metrics Tracked
+
+- Generation counts by template
+- Popular templates and packs
+- Session duration and patterns
+- Error rates and types
 
 ## Configuration
 
@@ -148,13 +254,12 @@ const templates = listTemplates();
 
 ## Roadmap
 
-- [x] **MCP Server** - Native Claude/Cursor integration
-- [x] **CLI Tool** - Command-line interface
-- [ ] **AI Interview Engine** - Adaptive questioning
-- [ ] **Deep Integrations** - GitHub, Linear, Jira, Notion
-- [ ] **Chat Bot Support** - Slack, Discord doc generation
-- [ ] **Custom Templates** - YAML-based template builder
-- [ ] **Multi-Model Support** - Claude, GPT-4, Gemini
+- [x] **Phase 1: MCP Server** - Native Claude/Cursor integration
+- [x] **Phase 2: AI Interview Engine** - Adaptive questioning with project detection
+- [x] **Phase 3: Deep Integrations** - GitHub, Linear, Jira, Notion export
+- [x] **Phase 4: Enterprise Features** - Custom templates, REST API, webhooks, multi-model
+- [x] **Phase 5: Ecosystem** - Template marketplace, plugins, analytics
+- [ ] **Coming Soon** - Web UI, team collaboration, Slack/Discord bots
 
 ## Development
 
