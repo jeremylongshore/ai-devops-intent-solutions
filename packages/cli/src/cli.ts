@@ -333,14 +333,226 @@ program
     console.log(chalk.dim(`\nTotal: ${templates.length} templates`));
   });
 
-// Export command (placeholder)
+// Export command - GitHub integration
 program
   .command('export <target>')
-  .description('Export to GitHub, Linear, Jira, or Notion')
+  .description('Export to GitHub (issues, milestones, PR templates)')
   .option('-p, --project <name>', 'Project name')
-  .action((target, options) => {
-    console.log(chalk.yellow(`\n⚠️  Export to ${target} coming soon!\n`));
-    console.log(chalk.dim('For now, use the generated markdown files directly.'));
+  .option('-d, --docs <dir>', 'Generated docs directory')
+  .option('-t, --token <token>', 'GitHub token (or use GITHUB_TOKEN env)')
+  .option('-o, --owner <owner>', 'Repository owner')
+  .option('-r, --repo <repo>', 'Repository name')
+  .option('--dry-run', 'Preview what would be exported without making changes')
+  .option('--no-issues', 'Skip creating issues')
+  .option('--no-milestones', 'Skip creating milestones')
+  .option('--no-labels', 'Skip creating labels')
+  .option('--no-pr-templates', 'Skip creating PR templates')
+  .action(async (target, options) => {
+    if (target !== 'github') {
+      console.log(chalk.yellow(`\n⚠️  Export to ${target} coming soon!\n`));
+      console.log(chalk.dim('Currently supported: github'));
+      return;
+    }
+
+    console.log(chalk.blue('\n🚀 Intent Blueprint - GitHub Export\n'));
+
+    const { GitHubExporter } = await import('./integrations/github/index.js');
+
+    // Get GitHub config
+    const token = options.token || process.env.GITHUB_TOKEN;
+    if (!token) {
+      console.log(chalk.red('Error: GitHub token required'));
+      console.log(chalk.dim('Use --token or set GITHUB_TOKEN environment variable'));
+      process.exit(1);
+    }
+
+    let owner = options.owner;
+    let repo = options.repo;
+
+    // Try to detect from git remote if not specified
+    if (!owner || !repo) {
+      try {
+        const { execSync } = await import('child_process');
+        const remote = execSync('git remote get-url origin', { encoding: 'utf-8' }).trim();
+        const match = remote.match(/github\.com[:/]([^/]+)\/([^/.]+)/);
+        if (match) {
+          owner = owner || match[1];
+          repo = repo || match[2];
+        }
+      } catch {
+        // Ignore
+      }
+    }
+
+    if (!owner || !repo) {
+      const answers = await inquirer.prompt([
+        {
+          type: 'input',
+          name: 'owner',
+          message: 'Repository owner:',
+          when: !owner,
+          validate: (input: string) => input.length > 0 || 'Required',
+        },
+        {
+          type: 'input',
+          name: 'repo',
+          message: 'Repository name:',
+          when: !repo,
+          validate: (input: string) => input.length > 0 || 'Required',
+        },
+      ]);
+      owner = owner || answers.owner;
+      repo = repo || answers.repo;
+    }
+
+    // Read generated docs
+    const docsDir = options.docs || './docs';
+    const { readdirSync, readFileSync, existsSync } = await import('fs');
+    const { join } = await import('path');
+
+    if (!existsSync(docsDir)) {
+      console.log(chalk.red(`Error: Docs directory not found: ${docsDir}`));
+      console.log(chalk.dim('Generate docs first with: blueprint generate'));
+      process.exit(1);
+    }
+
+    // Find project folder
+    const projects = readdirSync(docsDir).filter((f) => {
+      const path = join(docsDir, f);
+      return existsSync(path) && readdirSync(path).some((f) => f.endsWith('.md'));
+    });
+
+    if (projects.length === 0) {
+      console.log(chalk.red('Error: No documentation projects found'));
+      process.exit(1);
+    }
+
+    let projectDir = projects[0];
+    if (projects.length > 1 && !options.project) {
+      const answer = await inquirer.prompt([
+        {
+          type: 'list',
+          name: 'project',
+          message: 'Select project:',
+          choices: projects,
+        },
+      ]);
+      projectDir = answer.project;
+    } else if (options.project) {
+      projectDir = options.project;
+    }
+
+    const projectPath = join(docsDir, projectDir);
+    const files = readdirSync(projectPath).filter((f) => f.endsWith('.md'));
+
+    const documents = files.map((f) => ({
+      name: f.replace('.md', '').replace(/-/g, ' '),
+      filename: f,
+      content: readFileSync(join(projectPath, f), 'utf-8'),
+      category: 'Generated',
+    }));
+
+    console.log(`Found ${documents.length} documents in ${projectDir}\n`);
+
+    const exporter = new GitHubExporter(
+      { token, owner, repo },
+      {
+        createIssues: options.issues !== false,
+        createMilestones: options.milestones !== false,
+        createLabels: options.labels !== false,
+        createPRTemplates: options.prTemplates !== false,
+        dryRun: options.dryRun,
+      }
+    );
+
+    if (options.dryRun) {
+      console.log(chalk.yellow('Dry run - showing what would be created:\n'));
+      const preview = await exporter.preview(documents, {
+        projectName: projectDir,
+        projectDescription: '',
+        scope: 'standard',
+        audience: 'business',
+      });
+
+      console.log(chalk.cyan('Labels:'), preview.labels.length);
+      console.log(chalk.cyan('Tasks:'), preview.tasks.length);
+      console.log(chalk.cyan('Milestones:'), preview.phases.length);
+      console.log(chalk.cyan('PR Templates:'), preview.prTemplates.join(', '));
+      return;
+    }
+
+    const spinner = ora('Exporting to GitHub...').start();
+
+    try {
+      const result = await exporter.export(documents, {
+        projectName: projectDir,
+        projectDescription: '',
+        scope: 'standard',
+        audience: 'business',
+      });
+
+      if (result.success) {
+        spinner.succeed(chalk.green('Export complete!'));
+        console.log(`\n  Labels created: ${result.created.labels}`);
+        console.log(`  Issues created: ${result.created.issues}`);
+        console.log(`  Milestones created: ${result.created.milestones}`);
+        console.log(`  PR templates created: ${result.created.prTemplates}`);
+
+        if (result.urls.length > 0) {
+          console.log(chalk.cyan('\nCreated issues:'));
+          for (const url of result.urls.slice(0, 5)) {
+            console.log(`  ${url}`);
+          }
+          if (result.urls.length > 5) {
+            console.log(chalk.dim(`  ... and ${result.urls.length - 5} more`));
+          }
+        }
+      } else {
+        spinner.fail(chalk.red('Export failed'));
+        for (const error of result.errors) {
+          console.log(chalk.red(`  ${error}`));
+        }
+      }
+    } catch (error) {
+      spinner.fail(chalk.red('Export failed'));
+      console.error(error);
+      process.exit(1);
+    }
+  });
+
+// GitHub Action command
+program
+  .command('github-action')
+  .description('Generate GitHub Action workflow for doc automation')
+  .option('-p, --project <name>', 'Project name', 'My Project')
+  .option('-s, --scope <scope>', 'Documentation scope', 'standard')
+  .option('-o, --output <dir>', 'Output directory', '.github/workflows')
+  .action(async (options) => {
+    console.log(chalk.blue('\n📋 Generating GitHub Action workflow...\n'));
+
+    const { generateAllActions } = await import('./integrations/github/index.js');
+    const { mkdirSync, writeFileSync, existsSync } = await import('fs');
+    const { join } = await import('path');
+
+    const actions = generateAllActions({
+      projectName: options.project,
+      scope: options.scope,
+      audience: 'business',
+      onPush: true,
+      createIssues: true,
+    });
+
+    if (!existsSync(options.output)) {
+      mkdirSync(options.output, { recursive: true });
+    }
+
+    for (const [filename, content] of Object.entries(actions)) {
+      const path = join(options.output, filename);
+      writeFileSync(path, content);
+      console.log(chalk.green(`Created: ${path}`));
+    }
+
+    console.log(chalk.dim('\nCommit these files to enable automated documentation.'));
   });
 
 // Sync command (placeholder)

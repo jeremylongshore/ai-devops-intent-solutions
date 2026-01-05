@@ -1,6 +1,6 @@
 {
   "name": "@intentsolutions/blueprint-chatbots",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "Slack and Discord integrations for Intent Blueprint Docs",
   "type": "module",
   "main": "dist/index.js",

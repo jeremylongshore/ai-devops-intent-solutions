@@ -50,3 +50,26 @@ export {
 
 // MCP server export
 export { startMcpServer } from './mcp/index.js';
+
+// GitHub integration exports
+export {
+  GitHubClient,
+  GitHubExporter,
+  exportToGitHub,
+  generateDocGenAction,
+  generatePRSyncAction,
+  generateAllActions,
+  CATEGORY_LABELS,
+  PRIORITY_LABELS,
+  STANDARD_LABELS,
+  type GitHubConfig,
+  type GitHubLabel,
+  type GitHubMilestone,
+  type GitHubIssue,
+  type GitHubPRTemplate,
+  type TaskBreakdown,
+  type ReleasePhase,
+  type ExportResult,
+  type ExportOptions,
+  type ActionConfig,
+} from './integrations/github/index.js';

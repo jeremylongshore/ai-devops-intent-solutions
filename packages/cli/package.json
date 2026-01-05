@@ -1,6 +1,6 @@
 {
   "name": "@intentsolutions/blueprint",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "Enterprise AI documentation generator - CLI, MCP Server, and programmatic API",
   "type": "module",
   "main": "dist/index.js",
@@ -50,6 +50,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^0.5.0",
+    "@octokit/rest": "^20.0.0",
     "chalk": "^5.3.0",
     "commander": "^12.0.0",
     "handlebars": "^4.7.8",
