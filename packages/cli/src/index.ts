@@ -73,3 +73,27 @@ export {
   type ExportOptions,
   type ActionConfig,
 } from './integrations/github/index.js';
+
+// Linear integration exports
+export {
+  LinearClient,
+  LinearExporter,
+  exportToLinear,
+  PRIORITY_MAP,
+  STANDARD_LABELS as LINEAR_STANDARD_LABELS,
+  CATEGORY_LABELS as LINEAR_CATEGORY_LABELS,
+  type LinearConfig,
+  type LinearTeam,
+  type LinearProject,
+  type LinearCycle,
+  type LinearLabel,
+  type LinearIssue,
+  type LinearWorkflowState,
+  type CreateIssueInput,
+  type CreateProjectInput,
+  type CreateCycleInput,
+  type LinearTaskBreakdown,
+  type LinearTaskItem,
+  type LinearExportResult,
+  type LinearExportOptions,
+} from './integrations/linear/index.js';
