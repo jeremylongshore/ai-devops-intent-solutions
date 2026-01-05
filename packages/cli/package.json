@@ -1,6 +1,6 @@
 {
   "name": "@intentsolutions/blueprint",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "description": "Enterprise AI documentation generator - CLI, MCP Server, and programmatic API",
   "type": "module",
   "main": "dist/index.js",

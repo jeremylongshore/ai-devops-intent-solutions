@@ -23,7 +23,7 @@ const program = new Command();
 program
   .name('blueprint')
   .description('Intent Blueprint - Enterprise AI Documentation Generator')
-  .version('2.4.0');
+  .version('2.5.0');
 
 // Init command
 program
@@ -333,32 +333,43 @@ program
     console.log(chalk.dim(`\nTotal: ${templates.length} templates`));
   });
 
-// Export command - GitHub and Linear integration
+// Export command - GitHub, Linear, and Jira integration
 program
   .command('export <target>')
-  .description('Export to GitHub or Linear (issues, milestones, cycles)')
+  .description('Export to GitHub, Linear, or Jira (issues, milestones, sprints)')
   .option('-p, --project <name>', 'Project name')
   .option('-d, --docs <dir>', 'Generated docs directory')
-  .option('-t, --token <token>', 'API token (or use GITHUB_TOKEN / LINEAR_API_KEY env)')
+  .option('-t, --token <token>', 'API token (or use GITHUB_TOKEN / LINEAR_API_KEY / JIRA_API_TOKEN env)')
   .option('-o, --owner <owner>', 'Repository owner (GitHub)')
   .option('-r, --repo <repo>', 'Repository name (GitHub)')
   .option('--team <id>', 'Linear team ID')
+  .option('--base-url <url>', 'Jira instance URL (e.g., https://your-domain.atlassian.net)')
+  .option('--email <email>', 'Jira user email')
+  .option('--project-key <key>', 'Jira project key')
   .option('--dry-run', 'Preview what would be exported without making changes')
   .option('--no-issues', 'Skip creating issues')
-  .option('--no-milestones', 'Skip creating milestones/cycles')
-  .option('--no-labels', 'Skip creating labels')
+  .option('--no-milestones', 'Skip creating milestones/cycles/sprints')
+  .option('--no-labels', 'Skip creating labels/components')
   .option('--no-pr-templates', 'Skip creating PR templates (GitHub only)')
   .option('--create-project', 'Create a new project in Linear')
+  .option('--create-epic', 'Create an Epic in Jira')
+  .option('--create-versions', 'Create versions/releases in Jira')
   .action(async (target, options) => {
-    if (target !== 'github' && target !== 'linear') {
-      console.log(chalk.yellow(`\n⚠️  Export to ${target} coming soon!\n`));
-      console.log(chalk.dim('Currently supported: github, linear'));
+    if (target !== 'github' && target !== 'linear' && target !== 'jira') {
+      console.log(chalk.yellow(`\n⚠️  Export to ${target} not supported.\n`));
+      console.log(chalk.dim('Currently supported: github, linear, jira'));
       return;
     }
 
     // Handle Linear export
     if (target === 'linear') {
       await handleLinearExport(options);
+      return;
+    }
+
+    // Handle Jira export
+    if (target === 'jira') {
+      await handleJiraExport(options);
       return;
     }
 
@@ -739,6 +750,201 @@ async function handleLinearExport(options: Record<string, unknown>) {
     } else {
       spinner.fail(chalk.red('Export completed with errors'));
       console.log(`\n  Issues created: ${result.issues.length}`);
+      console.log(chalk.red('\nErrors:'));
+      for (const error of result.errors) {
+        console.log(chalk.red(`  ${error}`));
+      }
+    }
+  } catch (error) {
+    spinner.fail(chalk.red('Export failed'));
+    console.error(error);
+    process.exit(1);
+  }
+}
+
+/**
+ * Handle Jira export
+ */
+async function handleJiraExport(options: Record<string, unknown>) {
+  console.log(chalk.blue('\n🎫 Intent Blueprint - Jira Export\n'));
+
+  const { JiraExporter, JiraClient } = await import('./integrations/jira/index.js');
+
+  // Get Jira config
+  const apiToken = (options.token as string) || process.env.JIRA_API_TOKEN;
+  let baseUrl = options.baseUrl as string;
+  let email = options.email as string;
+  let projectKey = options.projectKey as string;
+
+  if (!apiToken) {
+    console.log(chalk.red('Error: Jira API token required'));
+    console.log(chalk.dim('Use --token or set JIRA_API_TOKEN environment variable'));
+    console.log(chalk.dim('Get your API token from: https://id.atlassian.com/manage-profile/security/api-tokens'));
+    process.exit(1);
+  }
+
+  // Prompt for missing Jira config
+  if (!baseUrl || !email || !projectKey) {
+    const answers = await inquirer.prompt([
+      {
+        type: 'input',
+        name: 'baseUrl',
+        message: 'Jira instance URL (e.g., https://your-domain.atlassian.net):',
+        when: !baseUrl,
+        validate: (input: string) => input.startsWith('http') || 'Must be a valid URL',
+      },
+      {
+        type: 'input',
+        name: 'email',
+        message: 'Your Jira email:',
+        when: !email,
+        validate: (input: string) => input.includes('@') || 'Must be a valid email',
+      },
+      {
+        type: 'input',
+        name: 'projectKey',
+        message: 'Jira project key (e.g., PROJ):',
+        when: !projectKey,
+        validate: (input: string) => input.length > 0 || 'Required',
+      },
+    ]);
+    baseUrl = baseUrl || answers.baseUrl;
+    email = email || answers.email;
+    projectKey = projectKey || answers.projectKey;
+  }
+
+  // Verify connection
+  try {
+    const tempClient = new JiraClient({ baseUrl, email, apiToken, projectKey });
+    const user = await tempClient.verify();
+    console.log(chalk.dim(`Connected as: ${user.displayName}\n`));
+  } catch (error) {
+    console.log(chalk.red('Error: Could not connect to Jira. Check your credentials.'));
+    console.error(error);
+    process.exit(1);
+  }
+
+  // Read generated docs
+  const docsDir = (options.docs as string) || './docs';
+  const { readdirSync, readFileSync, existsSync } = await import('fs');
+  const { join } = await import('path');
+
+  if (!existsSync(docsDir)) {
+    console.log(chalk.red(`Error: Docs directory not found: ${docsDir}`));
+    console.log(chalk.dim('Generate docs first with: blueprint generate'));
+    process.exit(1);
+  }
+
+  // Find project folder
+  const projects = readdirSync(docsDir).filter((f) => {
+    const path = join(docsDir, f);
+    return existsSync(path) && readdirSync(path).some((file) => file.endsWith('.md'));
+  });
+
+  if (projects.length === 0) {
+    console.log(chalk.red('Error: No documentation projects found'));
+    process.exit(1);
+  }
+
+  let projectDir = projects[0];
+  if (projects.length > 1 && !options.project) {
+    const answer = await inquirer.prompt([
+      {
+        type: 'list',
+        name: 'project',
+        message: 'Select project:',
+        choices: projects,
+      },
+    ]);
+    projectDir = answer.project;
+  } else if (options.project) {
+    projectDir = options.project as string;
+  }
+
+  const projectPath = join(docsDir, projectDir);
+  const files = readdirSync(projectPath).filter((f) => f.endsWith('.md'));
+
+  const documents = files.map((f) => ({
+    name: f.replace('.md', '').replace(/-/g, ' '),
+    content: readFileSync(join(projectPath, f), 'utf-8'),
+  }));
+
+  console.log(`Found ${documents.length} documents in ${projectDir}\n`);
+
+  const exporter = new JiraExporter({ baseUrl, email, apiToken, projectKey });
+
+  if (options.dryRun) {
+    console.log(chalk.yellow('Dry run - showing what would be created:\n'));
+    const preview = await exporter.preview(documents, {
+      createEpic: options.createEpic as boolean,
+      epicName: projectDir,
+      createSprints: options.milestones !== false,
+      createVersions: options.createVersions as boolean,
+      syncComponents: options.labels !== false,
+      addLabels: options.labels !== false,
+      dryRun: true,
+    });
+
+    console.log(chalk.cyan('Components:'), preview.components.length);
+    if (preview.epics.length > 0) {
+      console.log(chalk.cyan('Epic:'), preview.epics[0].fields.summary);
+    }
+    if (preview.versions.length > 0) {
+      console.log(chalk.cyan('Versions:'), preview.versions.map(v => v.name).join(', '));
+    }
+    console.log(chalk.cyan('Sprints:'), preview.sprints.length);
+    console.log(chalk.cyan('Stories:'), preview.stories.length);
+    console.log(chalk.cyan('Sub-tasks:'), preview.tasks.length);
+
+    if (preview.stories.length > 0) {
+      console.log(chalk.dim('\nSample stories:'));
+      for (const story of preview.stories.slice(0, 5)) {
+        console.log(`  ${chalk.dim('•')} ${story.fields.summary}`);
+      }
+      if (preview.stories.length > 5) {
+        console.log(chalk.dim(`  ... and ${preview.stories.length - 5} more`));
+      }
+    }
+    return;
+  }
+
+  const spinner = ora('Exporting to Jira...').start();
+
+  try {
+    const result = await exporter.export(documents, {
+      createEpic: options.createEpic as boolean,
+      epicName: projectDir,
+      createSprints: options.milestones !== false,
+      createVersions: options.createVersions as boolean,
+      syncComponents: options.labels !== false,
+      addLabels: options.labels !== false,
+      dryRun: false,
+    });
+
+    if (result.errors.length === 0) {
+      spinner.succeed(chalk.green('Export complete!'));
+      console.log(`\n  Components synced: ${result.components.length}`);
+      if (result.epics.length > 0) {
+        console.log(`  Epic created: ${result.epics[0].key}`);
+      }
+      console.log(`  Versions created: ${result.versions.length}`);
+      console.log(`  Sprints created: ${result.sprints.length}`);
+      console.log(`  Stories created: ${result.stories.length}`);
+      console.log(`  Sub-tasks created: ${result.tasks.length}`);
+
+      if (result.stories.length > 0) {
+        console.log(chalk.cyan('\nCreated stories:'));
+        for (const story of result.stories.slice(0, 5)) {
+          console.log(`  ${story.key}: ${story.fields.summary}`);
+          console.log(chalk.dim(`    ${baseUrl}/browse/${story.key}`));
+        }
+        if (result.stories.length > 5) {
+          console.log(chalk.dim(`  ... and ${result.stories.length - 5} more`));
+        }
+      }
+    } else {
+      spinner.fail(chalk.red('Export completed with errors'));
+      console.log(`\n  Stories created: ${result.stories.length}`);
       console.log(chalk.red('\nErrors:'));
       for (const error of result.errors) {
         console.log(chalk.red(`  ${error}`));

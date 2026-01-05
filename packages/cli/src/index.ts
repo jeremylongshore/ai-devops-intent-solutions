@@ -97,3 +97,32 @@ export {
   type LinearExportResult,
   type LinearExportOptions,
 } from './integrations/linear/index.js';
+
+// Jira integration exports
+export {
+  JiraClient,
+  JiraExporter,
+  exportToJira,
+  PRIORITY_MAP as JIRA_PRIORITY_MAP,
+  STANDARD_LABELS as JIRA_STANDARD_LABELS,
+  CATEGORY_COMPONENTS,
+  type JiraConfig,
+  type JiraProject,
+  type JiraIssueType,
+  type JiraPriority,
+  type JiraStatus,
+  type JiraUser,
+  type JiraSprint,
+  type JiraBoard,
+  type JiraComponent,
+  type JiraVersion,
+  type JiraIssue,
+  type CreateIssueInput as JiraCreateIssueInput,
+  type CreateSprintInput,
+  type CreateVersionInput,
+  type JiraTaskBreakdown,
+  type JiraStoryItem,
+  type JiraTaskItem,
+  type JiraExportResult,
+  type JiraExportOptions,
+} from './integrations/jira/index.js';
